@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 # Load the trained model
-model = joblib.load('zimbabwe_vehicle_fraud_model_final.pkl')
+model = joblib.load('models\zimbabwe_vehicle_fraud_model_final.pkl')
 
 # Function to make predictions
 def predict_fraud(input_data):
