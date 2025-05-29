@@ -5,7 +5,7 @@ import joblib
 from sklearn.preprocessing import StandardScaler
 
 # Load the saved model
-model = joblib.load('zimbabwe_vehicle_fraud_model_final.pkl')
+model = joblib.load('./zimbabwe_vehicle_fraud_model_final.pkl')
 
 # Preprocessing function (same as training)
 def preprocess_input(input_data):
