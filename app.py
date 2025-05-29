@@ -1,167 +1,64 @@
-import os
-import joblib
+import streamlit as st
 import pandas as pd
+import joblib
 import numpy as np
-from flask import Flask, render_template, request, jsonify
-from sklearn.metrics import pairwise_distances
 
-app = Flask(__name__)
+# Title
+st.set_page_config(page_title="Zimbabwe Vehicle Insurance Fraud Detector")
+st.title("🚗 Zimbabwe Vehicle Insurance Fraud Detection App")
+st.write("Predict the probability of a vehicle insurance fraud case using your model.")
 
-# Configuration
-MODEL_PATH = 'models/zimbabwe_vehicle_fraud_model_final.pkl'
-DATA_PATH = 'zimbabwe_vehicle_insurance_fraud.csv'
+# Load the trained model
+@st.cache_resource
+def load_model():
+    model = joblib.load("models/zimbabwe_vehicle_fraud_model_final.pkl")  # Path inside repo
+    return model
 
-class VehicleFraudDetector:
-    def __init__(self):
-        self.model = None
-        self.reference_set = None
-        self.freq_maps = {}
-        self.selected_features = [
-            "driver_age", "driver_gender_freq", "accident_location_freq",
-            "vehicle_type_freq", "model_freq", "year", "value",
-            "claim_type_freq", "days_active", "previous_claims", "police_report"
-        ]
-        self._load_resources()
+model = load_model()
 
-    def _load_resources(self):
-        """Load model and training data"""
-        try:
-            self.model = joblib.load(MODEL_PATH)
-            full_data = pd.read_csv(DATA_PATH)
-            self.reference_set = full_data.copy()
-            
-            # Create frequency maps for categorical variables
-            for col in ['driver_gender', 'accident_location', 'vehicle_type', 'model', 'claim_type']:
-                self.freq_maps[col] = full_data[col].value_counts(normalize=True).to_dict()
-                
-        except Exception as e:
-            raise RuntimeError(f"Failed to load resources: {str(e)}")
+# Input fields for prediction
+st.header("Enter Claim Information")
 
-    def preprocess_input(self, input_data):
-        """Transform raw form data into model-ready features"""
-        data = pd.DataFrame([input_data])
-        
-        # Process numerical fields
-        num_cols = ['driver_age', 'year', 'value', 'days_active', 'previous_claims', 'police_report']
-        for col in num_cols:
-            data[col] = pd.to_numeric(data.get(col, 0), errors='coerce').fillna(0)
-        
-        # Calculate frequency features
-        data['driver_gender_freq'] = data['driver_gender'].map(self.freq_maps['driver_gender']).fillna(0)
-        data['accident_location_freq'] = data['accident_location'].map(self.freq_maps['accident_location']).fillna(0)
-        data['vehicle_type_freq'] = data['vehicle_type'].map(self.freq_maps['vehicle_type']).fillna(0)
-        data['model_freq'] = data['model'].map(self.freq_maps['model']).fillna(0)
-        data['claim_type_freq'] = data['claim_type'].map(self.freq_maps['claim_type']).fillna(0)
-        
-        # Ensure all selected features exist
-        for feature in self.selected_features:
-            if feature not in data.columns:
-                data[feature] = 0
-                
-        return data[self.selected_features]
+driver_age = st.number_input("Driver Age", min_value=18, max_value=100, value=30)
+driver_gender = st.selectbox("Driver Gender", ["Male", "Female"])
+accident_location = st.text_input("Accident Location", "Harare")
+vehicle_type = st.selectbox("Vehicle Type", ["Sedan", "SUV", "Truck", "Bus", "Other"])
+vehicle_model = st.text_input("Vehicle Model", "Toyota Fortuner")
+vehicle_year = st.number_input("Vehicle Year", min_value=1980, max_value=2025, value=2018)
+vehicle_value = st.number_input("Vehicle Value (USD)", min_value=500, max_value=50000, value=15000)
+claim_type = st.selectbox("Claim Type", ["Theft", "Accident", "Fire", "Flood", "Other"])
+days_active = st.number_input("Days Policy Active", min_value=1, max_value=5000, value=365)
+previous_claims = st.number_input("Number of Previous Claims", min_value=0, max_value=10, value=1)
+police_report = st.selectbox("Police Report Filed?", ["Yes", "No"])
 
-    def find_similar_cases(self, input_data, n=5):
-        """Find similar historical cases"""
-        try:
-            input_processed = self.preprocess_input(input_data)
-            ref_data = self.reference_set.copy()
-            
-            # Prepare reference data with same features
-            for col in ['driver_gender', 'accident_location', 'vehicle_type', 'model', 'claim_type']:
-                ref_data[f'{col}_freq'] = ref_data[col].map(self.freq_maps[col]).fillna(0)
-            
-            ref_processed = ref_data[self.selected_features].fillna(0)
-            
-            # Calculate similarities
-            similarities = 1 - pairwise_distances(
-                input_processed, 
-                ref_processed, 
-                metric='cosine'
-            )[0]
-            
-            # Get top matches
-            top_indices = np.argsort(similarities)[-n:][::-1]
-            similar_cases = ref_data.iloc[top_indices].copy()
-            similar_cases['similarity'] = similarities[top_indices]
-            
-            return similar_cases[[
-                'claim_id', 'province', 'city', 'make', 'model', 
-                'vehicle_type', 'year', 'value', 'claim_type', 
-                'amount', 'driver_age', 'driver_gender', 
-                'accident_location', 'police_report',
-                'previous_claims', 'days_active', 'is_fraud', 'similarity'
-            ]]
-        except Exception as e:
-            app.logger.error(f"Error finding similar cases: {str(e)}")
-            return pd.DataFrame()
+# Convert police report to binary
+police_report_binary = 1 if police_report == "Yes" else 0
 
-# Initialize detector
-try:
-    fraud_detector = VehicleFraudDetector()
-except Exception as e:
-    print(f"Failed to initialize: {str(e)}")
-    exit(1)
+# Submit button
+if st.button("Predict Fraud Probability"):
+    try:
+        # Input data as DataFrame (you may need to one-hot encode or label encode in real use)
+        input_data = pd.DataFrame([{
+            'driver_age': driver_age,
+            'driver_gender': driver_gender,
+            'accident_location': accident_location,
+            'vehicle_type': vehicle_type,
+            'model': vehicle_model,
+            'year': vehicle_year,
+            'value': vehicle_value,
+            'claim_type': claim_type,
+            'days_active': days_active,
+            'previous_claims': previous_claims,
+            'police_report': police_report_binary
+        }])
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+        # Ensure your model pipeline includes preprocessing
+        fraud_proba = model.predict_proba(input_data)[0][1]
+        risk_level = "High" if fraud_proba >= 0.7 else "Medium" if fraud_proba >= 0.4 else "Low"
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    if request.method == 'POST':
-        form_data = request.form.to_dict()
-        
-        try:
-            # Get prediction
-            processed_data = fraud_detector.preprocess_input(form_data)
-            fraud_prob = fraud_detector.model.predict_proba(processed_data)[0][1]
-            fraud_percent = round(fraud_prob * 100, 2)
-            
-            # Get similar cases
-            similar_cases = fraud_detector.find_similar_cases(form_data)
-            
-            # Adjust prediction
-            if not similar_cases.empty:
-                similar_fraud_rate = similar_cases['is_fraud'].mean()
-                if similar_fraud_rate > 0.5 and fraud_prob < 0.5:
-                    fraud_prob = min(fraud_prob + 0.3, 0.99)
-                    fraud_percent = round(fraud_prob * 100, 2)
-            
-            # Risk classification
-            if fraud_prob >= 0.7:
-                risk_level, risk_class = "High Risk", "high-risk"
-            elif fraud_prob >= 0.4:
-                risk_level, risk_class = "Medium Risk", "medium-risk"
-            else:
-                risk_level, risk_class = "Low Risk", "low-risk"
-            
-            return render_template('result.html',
-                fraud_prob=fraud_percent,
-                risk_level=risk_level,
-                risk_class=risk_class,
-                similar_cases=similar_cases.to_dict('records'),
-                form_data=form_data)
-            
-        except Exception as e:
-            return render_template('index.html',
-                errors=[f"Error: {str(e)}"],
-                form_data=form_data)
+        st.subheader("🧾 Prediction Result")
+        st.metric(label="Fraud Probability", value=f"{fraud_proba:.2%}")
+        st.metric(label="Risk Level", value=risk_level)
 
-@app.route('/api/predict', methods=['POST'])
-def api_predict():
-    if request.method == 'POST':
-        try:
-            input_data = request.get_json()
-            processed_data = fraud_detector.preprocess_input(input_data)
-            fraud_prob = fraud_detector.model.predict_proba(processed_data)[0][1]
-            
-            return jsonify({
-                'fraud_probability': float(fraud_prob),
-                'risk_level': "High" if fraud_prob >= 0.7 else "Medium" if fraud_prob >= 0.4 else "Low",
-                'status': 'success'
-            })
-        except Exception as e:
-            return jsonify({'status': 'error', 'message': str(e)}), 400
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    except Exception as e:
+        st.error(f"Prediction failed: {e}")
