@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraud Detection Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .risk-indicator {
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .high-risk { background-color: #dc3545; }
+        .medium-risk { background-color: #fd7e14; }
+        .low-risk { background-color: #198754; }
+        .similar-case {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .similarity-meter {
+            height: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+        .similarity-fill {
+            height: 100%;
+            background: #0d6efd;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h2>Fraud Detection Results</h2>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>Vehicle Details</h4>
+                        <p><strong>Make/Model:</strong> {{ form_data.make }} {{ form_data.model }}</p>
+                        <p><strong>Type:</strong> {{ form_data.vehicle_type }}</p>
+                        <p><strong>Year:</strong> {{ form_data.year }}</p>
+                        <p><strong>Value:</strong> ${{ "%.2f"|format(form_data.value|float) }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Claim Details</h4>
+                        <p><strong>Type:</strong> {{ form_data.claim_type }}</p>
+                        <p><strong>Amount:</strong> ${{ "%.2f"|format(form_data.amount|float) }}</p>
+                        <p><strong>Location:</strong> {{ form_data.accident_location }}</p>
+                        <p><strong>Police Report:</strong> {{ 'Yes' if form_data.police_report == '1' else 'No' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="risk-indicator {{ risk_class }}">
+            <h3>Fraud Probability: {{ fraud_prob }}%</h3>
+            <h2>{{ risk_level }}</h2>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Driver Information</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Age:</strong> {{ form_data.driver_age }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Gender:</strong> {{ 'Male' if form_data.driver_gender == 'M' else 'Female' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Previous Claims:</strong> {{ form_data.previous_claims }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Days Active:</strong> {{ form_data.days_active }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="mb-3">Similar Historical Cases</h3>
+        {% if similar_cases %}
+            {% for case in similar_cases %}
+                <div class="similar-case">
+                    <div class="d-flex justify-content-between">
+                        <h5>{{ case.make }} {{ case.model }} ({{ case.year }})</h5>
+                        <span class="badge {% if case.is_fraud %}bg-danger{% else %}bg-success{% endif %}">
+                            {% if case.is_fraud %}Fraud{% else %}Genuine{% endif %}
+                        </span>
+                    </div>
+                    <p><strong>Claim:</strong> {{ case.claim_type }} (${{ "%.2f"|format(case.amount|float) }})</p>
+                    <p><strong>Location:</strong> {{ case.accident_location }}</p>
+                    <p><strong>Police Report:</strong> {{ 'Yes' if case.police_report == 1 else 'No' }}</p>
+                    <p>Similarity: {{ "%.1f"|format(case.similarity * 100) }}%</p>
+                    <div class="similarity-meter">
+                        <div class="similarity-fill" style="width: {{ case.similarity * 100 }}%"></div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-warning">No similar cases found</div>
+        {% endif %}
+
+        <div class="text-center mt-4">
+            <a href="/" class="btn btn-primary">Analyze Another Claim</a>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
