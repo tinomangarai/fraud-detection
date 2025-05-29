@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import imblearn
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTE
 from sklearn.metrics import pairwise_distances
 
 # ----------------------------------------------------------------------------------
